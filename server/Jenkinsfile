@@ -1,0 +1,49 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('Checkout') {
+            steps {
+                echo 'Checking out...'
+                git credentialsId: 'dianagsilva-bitbucket-credentials', url: 'https://bitbucket.org/dianagsilva/devops-18-19-atb-1181702_v2'
+            }
+        }
+        stage('Assemble') {
+            steps {
+                echo 'Building...'
+                sh 'cd CA2_Part2_Alternative/server; ./gradlew assemble'
+            }
+        }
+        stage('Test') {
+            steps {
+                echo 'Testing...'
+                sh 'cd CA2_Part2_Alternative/server; ./gradlew test'
+            }
+        }
+		stage('Javadoc') {
+		steps {
+                echo 'Creating javadocs...'
+				sh 'cd CA2_Part2_Alternative/server; ./gradlew javadoc'
+				sh 'cd CA2_Part2_Alternative/server; ./gradlew renderPlantUml'
+				publishHTML(target:[allowMissing: false, alwaysLinkToLastBuild: false, keepAll: false, reportDir: 'CA2_Part2_Alternative/server/build/docs/javadoc', reportFiles: 'index.html', reportName: 'HTML Report', reportTitles: 'index'])
+            }
+		}
+		stage('Archiving') {
+            steps {
+                echo 'Archiving...'
+                archiveArtifacts 'CA2_Part2_Alternative/server/build/libs/*'
+            }
+        }
+		stage ('Docker Image') {
+            steps {
+                echo 'Building and pushing image...'
+                script {
+                    def errai_demo = docker.build("1181702/ca5-alternative:${env.BUILD_ID}",'./CA2_Part2_Alternative/server/')
+                    docker.withRegistry('https://registry.hub.docker.com', 'docker-hub-credentials') {
+                        errai_demo.push('latest')
+                    }
+                }
+            }
+        }
+    }
+}
